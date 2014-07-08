@@ -1,37 +1,68 @@
 #!/bin/ruby
 
-require "rbtagger"
+require "engtagger"
+require "optparse"
 
-$nurble_word = "nurble"
-
-# tag -> word
-def convert(tag)
-  word = tag[1]
-end
-
-# nurblefy text
-def process(raw_text)
-  tagger = Brill::Tagger.new
+# Nurblefy a block of text
+def nurblefy(raw_text, nurble_word="nurble", uppercase_nouns=true)
+  tagger = EngTagger.new
 
   # split by newline
-  split_text = raw_text.split(/\r?\n/)
+  tagged_text = raw_text.split(/\r?\n/)
 
-  #tags = tagger.tag(text)
-  #nurbled_text = ""
-  #tags.each { |pair| nurbled_text += convert(pair) }
- 
-  split_text.map! { |line| tagger.tag(line) }
-  split_text.map { |line| line.map { |pair| pair[0] }}
+  # tag words
+  tagged_text.map! { |line| tagger.get_readable(line) }
 
-  nurbled_text = split_text.to_s
+  # split by word
+  tagged_text.map! { |line| 
+    if line == nil
+      [""]
+    else
+      line.split(" ")
+    end
+  }
 
-  return nurbled_text
+  noun_regex = /(.*)\/N+/
+
+  # nurblefy non-nouns
+  tagged_text.map! { |line| line.map! { |word|  
+    if word.length == 0
+      ""
+    elsif (match_data = noun_regex.match(word)) != nil
+      if uppercase_nouns
+        match_data[1].upcase
+      else
+        match_data[1]
+      end
+    else 
+      nurble_word
+    end
+  }}
+
+  tagged_text.map! { |line| line.join(" ") }
+
+  return tagged_text
 end
 
-
-# main loop
+# main() 
 if __FILE__ == $PROGRAM_NAME
+  nurble = "nurble"
+  lowercase = false
+
+  begin
+    OptionParser.new do |o|
+      o.on("--lowercase") { |l| lowercase = l }
+      o.on("--nurble WORD") { |word| nurble = word }
+      o.parse!
+    end
+  rescue
+    puts "Usage: nurble.rb [options] [file]"
+    puts "        --lowercase"
+    puts "        --nurble WORD"
+    exit
+  end
+
   raw_text = ARGF.read
-  puts process(raw_text)
+  puts nurblefy(raw_text, nurble, !lowercase)
 end
 
